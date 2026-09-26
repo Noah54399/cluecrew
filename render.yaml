@@ -22,30 +22,23 @@ services:
       # Render generates a strong value automatically.
       - key: TOKEN_ENCRYPTION_KEY
         generateValue: true
-      # URL configuration is optional: when these stay empty, the server uses
-      # Render's RENDER_EXTERNAL_URL (the assigned https://<service>.onrender.com
-      # URL) automatically, so no copy/paste is needed. Set them explicitly only
-      # for a custom domain or a split frontend/backend setup.
-      - key: BACKEND_URL
-        value: ''
-      - key: FRONTEND_URL
-        value: ''
-      - key: ALLOWED_ORIGINS
-        value: ''
+      # URL configuration is optional: the server automatically uses Render's
+      # RENDER_EXTERNAL_URL (the assigned https://<service>.onrender.com URL),
+      # so no manual values are needed. Set BACKEND_URL / FRONTEND_URL /
+      # ALLOWED_ORIGINS in the dashboard only for a custom domain or a split
+      # frontend/backend setup.
+      #
       # SQLite on the free tier is ephemeral (lost on restart/redeploy).
-      # Rooms are ephemeral by design; see docs/DEPLOYMENT.md for durability options.
+      # Rooms are ephemeral by design; see docs/DEPLOYMENT.md for options.
       - key: DATABASE_PATH
         value: ./data/cluecrew.sqlite
       - key: ALLOW_MOCK_PROVIDER
         value: 'true'
-      # Optional TikTok integration: add these in the dashboard after creating a
-      # TikTok developer app. The callback URL to register is always:
+      # Optional TikTok integration: add TIKTOK_CLIENT_KEY /
+      # TIKTOK_CLIENT_SECRET in the dashboard after creating a TikTok developer
+      # app. The callback URL to register is always:
       #   https://<your-service>.onrender.com/api/auth/tiktok/callback
-      - key: TIKTOK_CLIENT_KEY
-        value: ''
-      - key: TIKTOK_CLIENT_SECRET
-        value: ''
-      # Only enable after TikTok approves Data Portability (see docs/TIKTOK-DATA-PORTABILITY.md)
+      # Only enable Data Portability after TikTok approves it:
       - key: TIKTOK_DATAPORTABILITY_ENABLED
         value: 'false'
       - key: TIKTOK_DATAPORTABILITY_SCOPE
