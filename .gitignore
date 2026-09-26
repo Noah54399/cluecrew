@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.npm/
+.pnpm-store/
+
+# builds
+dist/
+build/
+*.tsbuildinfo
+
+# environment
+.env
+.env.local
+.env.*.local
+
+# data
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# logs
+*.log
+npm-debug.log*
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# test artifacts
+coverage/

@@ -1,0 +1,22 @@
+# Netlify configuration for the OPTIONAL split deployment:
+# static frontend on Netlify + backend on Render.
+#
+# In the Netlify UI set the environment variable:
+#   VITE_API_URL = https://your-backend.onrender.com
+#
+# Note: with separate sites the backend sets SameSite=None cookies and
+# enables CORS for the Netlify origin, but some browsers restrict
+# third-party cookies. The single-service setup (backend serves the
+# client) avoids that entirely - see docs/DEPLOYMENT.md.
+
+[build]
+  command = "npm ci && npm --workspace @cluecrew/client run build"
+  publish = "client/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

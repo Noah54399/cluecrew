@@ -1,0 +1,29 @@
+services:
+  cluecrew:
+    build: .
+    image: cluecrew:latest
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+      # Public origin of the deployment (HTTPS in real setups).
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3001}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3001}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3001}
+      # Required: 64 hex characters. Generate with:
+      #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?Set TOKEN_ENCRYPTION_KEY in your environment or .env file}
+      DATABASE_PATH: /app/data/cluecrew.sqlite
+      # Optional TikTok integration
+      TIKTOK_CLIENT_KEY: ${TIKTOK_CLIENT_KEY:-}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
+      TIKTOK_REDIRECT_URI: ${TIKTOK_REDIRECT_URI:-}
+      # Enable only after TikTok approves Data Portability (see docs/TIKTOK-DATA-PORTABILITY.md)
+      TIKTOK_DATAPORTABILITY_ENABLED: ${TIKTOK_DATAPORTABILITY_ENABLED:-false}
+      TIKTOK_DATAPORTABILITY_SCOPE: ${TIKTOK_DATAPORTABILITY_SCOPE:-portability.all.ongoing}
+      # Keep demo data enabled so every mode stays playable without TikTok access.
+      ALLOW_MOCK_PROVIDER: ${ALLOW_MOCK_PROVIDER:-true}
+    volumes:
+      - ./data:/app/data
