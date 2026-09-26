@@ -12,6 +12,7 @@ import { createLogger } from './lib/logger.js';
 import { DataPortabilityService } from './portability/DataPortabilityService.js';
 import { HttpTikTokDataPortabilityClient } from './portability/tiktokDataPortabilityClient.js';
 import { TikTokOEmbedClient } from './portability/oembed.js';
+import { clearAccountCache } from './providers/tiktok/accountData.js';
 
 const config = loadConfig();
 const logger = createLogger('server');
@@ -30,9 +31,13 @@ const dataPortability = new DataPortabilityService({
 
 const oauth = new TikTokOAuthService(config, repos, {
   onLinked: (userId) => {
+    clearAccountCache(userId);
     void dataPortability.ensureStarted(userId);
   },
-  onDisconnect: (userId) => dataPortability.deleteImport(userId),
+  onDisconnect: (userId) => {
+    clearAccountCache(userId);
+    dataPortability.deleteImport(userId);
+  },
 });
 
 const roomManager = new RoomManager({
@@ -68,9 +73,8 @@ httpServer.listen(config.port, () => {
     `  > Local:      ${config.publicUrl}`,
     `  > Client dev: ${config.clientUrl}`,
     `  > Database:   ${config.databasePath}`,
-    `  > TikTok:     ${config.tiktok.configured ? 'configured' : 'not configured (mock data available: ' + config.allowMockProvider + ')'}`,
+    `  > TikTok:     ${config.tiktok.configured ? `configured (scopes: ${config.tiktok.scopes.join(', ')})` : 'not configured — connect flow disabled'}`,
     `  > Activity:   ${dataPortability.enabled ? `import enabled (${config.dataPortability.scope})` : 'Data Portability import disabled'}`,
-    `  > Demo data:  ${config.allowMockProvider ? 'allowed' : 'disabled'}`,
     '',
   ];
   process.stdout.write(lines.join('\n') + '\n');

@@ -18,6 +18,29 @@ export function pointsLabel(points: number): string {
   return `${points} ${points === 1 ? 'point' : 'points'}`;
 }
 
+/** Compact number for real API values (e.g. 4242 -> "4.2K"). Never fakes values. */
+export function formatCount(value: number): string {
+  try {
+    return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(
+      value,
+    );
+  } catch {
+    return String(value);
+  }
+}
+
+export function formatDate(value: string | number): string {
+  const date = typeof value === 'number' ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function phaseHeadline(phase: string): string {
   switch (phase) {
     case 'WAITING_FOR_PLAYERS':

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { ActivityImportState, ContentSourcePreference, PublicServerConfig } from '@shared';
+import type { ActivityImportState, PublicServerConfig } from '@shared';
 import { ApiError, roomsApi, sessionApi } from '../lib/api';
 import { getPlayer, removePlayer, type StoredPlayer } from '../lib/storage';
 import { sounds } from '../lib/sound';
@@ -176,25 +176,11 @@ export function RoomPage() {
           config={config}
           tiktok={session?.tiktok ?? null}
           importState={localImport ?? session?.import ?? EMPTY_IMPORT_STATE}
-          preference={(session?.preference ?? 'auto') as ContentSourcePreference}
           busy={busy}
           onSettings={(patch) => void run(() => connection.emitAck('host:settings', { settings: patch }))}
           onStart={() => void run(() => connection.emitAck('host:start'))}
           onLeave={leave}
           onImportStateChange={(next) => setLocalImport(next)}
-          onPreferenceChange={(next) =>
-            void run(async () => {
-              await sessionApi.setPreference(next);
-              await refreshSession();
-              if (next === 'mock') {
-                toast.info('Demo mode enabled for your rounds.');
-              } else if (next === 'real') {
-                toast.info('Real TikTok mode enabled — only real data will be used.');
-              } else {
-                toast.info('Automatic content source enabled.');
-              }
-            })
-          }
           onConnectTikTok={() =>
             void run(async () => {
               const { url } = await sessionApi.tiktokStartUrl(`/room/${code}`);

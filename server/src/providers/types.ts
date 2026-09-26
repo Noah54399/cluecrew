@@ -3,7 +3,7 @@ import type { ActionKind, ContentSource } from '@cluecrew/shared';
 
 /** Minimal, display-ready content reference. No bulk provider payloads are kept. */
 export interface ContentItem {
-  provider: ContentSource;
+  provider: 'tiktok';
   kind: ActionKind;
   contentId: string;
   title: string | null;
@@ -43,7 +43,7 @@ export interface ProviderIdentity {
  */
 export interface SocialProvider {
   readonly source: ContentSource;
-  /** Human readable label shown in the lobby ("Demo data", "TikTok", ...). */
+  /** Human readable label shown in the lobby ("TikTok", "Not connected"). */
   readonly label: string;
   isConnected(): boolean;
   /** Verifies/refreshes the connection and returns the profile. */

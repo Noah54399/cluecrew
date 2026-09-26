@@ -22,7 +22,7 @@ This document explains how ClueCrew is put together and why.
 │  game/        RoomManager ─► GameEngine    │
 │  providers/   SocialProvider interface     │
 │               ├── TikTokProvider (official)│
-│               └── MockSocialProvider (demo)│
+│               └── DisconnectedSocialProvider (no connection)│
 │  database/    SQLite driver, schema, repos │
 └────────────────────────────────────────────┘
 ```
@@ -39,7 +39,7 @@ Host: host:start ─► GameEngine.prepareGame (scores reset, modes resolved)
                        ▼
              RoomManager.startNextRound
               ├─ planRoundCandidates()      (mode + actor selection, engine)
-              ├─ provider.getItems(...)     (mock or TikTok, per-player context)
+              ├─ provider.getItems(...)     (real TikTok, per-player context)
               ├─ pickUnusedContent()        (no repeats until exhausted → unlimited play)
               └─ engine.beginRound()        ─► phase ROUND_START
                        │
@@ -91,12 +91,11 @@ provider.fetchItems() ──► ContentItem { id, title, coverUrl, webUrl, autho
         │                         │
         │                         ├─ persisted once in round_actions (reference + display data)
         │                         └─ sent in snapshots as ContentView (author hidden pre-reveal)
-        └─ covers: data: URIs (demo) or proxied through /api/media/proxy (signed URL)
+        └─ covers: proxied through /api/media/proxy (signed URL)
 ```
 
 Cover images from TikTok CDNs are never hotlinked: the server signs the URL (HMAC) and serves
-it through an allow-listed, size-capped, cached proxy. Demo covers are generated SVG data URIs
-so nothing external is required.
+it through an allow-listed, size-capped, cached proxy.
 
 ## TikTok Data Portability import
 
@@ -134,13 +133,17 @@ Privacy invariants enforced in code and tests:
   metadata — nothing else;
 - deleting an import (or disconnecting TikTok) removes every imported row and any temp file.
 
-Provider selection (`providers/factory.ts`) honours the player preference:
+Provider selection (`providers/factory.ts`) is real-data-only:
 
-| Preference | Behaviour |
+| Situation | Provider |
 | --- | --- |
-| `auto` (default) | real TikTok when a usable connection exists (Data Portability import and/or Display API), clearly-labelled demo data for everything else |
-| `real` | real data only; modes without real data report as unavailable instead of silently using demo content |
-| `mock` | always clearly-labelled demo data (the development/demo switch); works with zero TikTok credentials |
+| TikTok linked + a Data Portability scope granted | `TikTokDataPortabilityProvider` (imported likes/saves + own videos via the Display API delegate) |
+| TikTok linked | `TikTokProvider` (own public videos, `video.list`) |
+| Nothing linked / tokens unusable | `DisconnectedSocialProvider` — supplies no content and carries the exact "Connect your TikTok account…" reason into the lobby |
+
+`RoomManager` accepts an injectable `providerFactory`; the automated tests pass a deterministic
+test double so full multiplayer games stay testable without live TikTok credentials. Production
+code never ships demo content.
 
 ## Authentication & sessions
 
@@ -179,7 +182,8 @@ game informs the group and lets them start again — no silent data loss, no bro
   the repository layer is the seam for PostgreSQL.
 - **Provider interface** — keeps the "what TikTok actually allows" reality out of the game
   logic and makes additional networks or future permissions a small, local change.
-- **Mock provider first-class** — a testable game that never pretends demo data is real.
+- **Real data only** — no demo provider ships in production; a test-only double keeps the
+  multiplayer suite runnable without live TikTok credentials.
 
 ## Test architecture
 

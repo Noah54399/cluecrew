@@ -16,8 +16,8 @@
 
 This document is the authoritative answer to "what may the official TikTok API actually do for us".
 Nothing in this project fakes TikTok data. Where the official API does not permit an action, the
-mode is either served by the clearly labelled **mock provider** (demo data) or reported as
-**unavailable**.
+mode is either served by a real provider or reported as
+**unavailable** (with the exact missing permission). Production ships **no demo data**.
 
 ---
 
@@ -52,9 +52,9 @@ These three capabilities power the game modes **Who Liked?**, **Who Saved?** and
 Because TikTok's official API does not expose them, this project:
 
 1. Keeps all three modes behind the `SocialProvider` interface, fully implemented against the engine.
-2. Ships a **mock provider** that generates clearly labelled demo content so every mode is playable and testable.
-3. Marks those modes in the UI with an explicit "Not available via TikTok's official API" badge whenever a real TikTok account would be required to supply them.
-4. Never presents mock data as TikTok data — the UI labels every mock item "Demo data".
+2. Leaves them **unavailable** (with the exact missing permission) — production ships no demo data.
+3. Marks those modes in the UI with an explicit "Not available via API" badge and a reason.
+4. Never invents values: unavailable means unavailable, with the scope that would be required.
 
 ---
 

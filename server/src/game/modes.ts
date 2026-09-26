@@ -11,7 +11,7 @@ import type { ProviderCapability, ProviderCapabilities } from '../providers/type
 
 export interface PlayerProviderInfo {
   playerId: string;
-  source: 'tiktok' | 'mock';
+  source: 'tiktok' | 'none';
   capabilities: ProviderCapabilities;
 }
 
@@ -38,8 +38,10 @@ export interface RoomModeSupport {
 }
 
 /**
- * Determines, per mode, which players can actually supply content and composes
- * the honest availability description shown in the lobby UI.
+ * Determines, per mode, which players can supply real content and composes the
+ * honest availability description shown in the lobby. There is no demo data:
+ * a mode with no supplier is simply unavailable, with the reason and the
+ * TikTok permission it would require.
  */
 export function computeRoomModeSupport(players: PlayerProviderInfo[]): RoomModeSupport {
   const suppliersByMode = {
@@ -52,40 +54,39 @@ export function computeRoomModeSupport(players: PlayerProviderInfo[]): RoomModeS
 
   for (const modeId of MODE_IDS) {
     const kind = MODES[modeId].kind;
-    const official: string[] = [];
-    const mock: string[] = [];
+    const suppliers: string[] = [];
+    const reasons: string[] = [];
 
     for (const player of players) {
       const capability = capabilityForKind(player.capabilities, kind);
       if (!capability.available) continue;
-      if (player.source === 'tiktok') official.push(player.playerId);
-      else mock.push(player.playerId);
+      suppliers.push(player.playerId);
+      if (capability.reason) reasons.push(capability.reason);
     }
 
-    const suppliers = [...official, ...mock];
     suppliersByMode[modeId] = suppliers;
 
     const sources: ModeAvailabilitySource[] = [];
-    if (official.length > 0) sources.push('official_api');
-    if (mock.length > 0) sources.push('mock');
-    if (suppliers.length === 0) {
-      sources.push(OFFICIAL_TIKTOK_ACCESS[modeId].approval === 'special' ? 'special_approval' : 'unavailable');
+    if (suppliers.length > 0) {
+      sources.push('official_api');
+    } else {
+      sources.push(
+        OFFICIAL_TIKTOK_ACCESS[modeId].approval === 'special' ? 'special_approval' : 'unavailable',
+      );
     }
 
     const access = OFFICIAL_TIKTOK_ACCESS[modeId];
     let reason: string;
-    if (official.length > 0 && mock.length > 0) {
-      reason = 'Real TikTok data for connected players, demo data for the rest.';
-    } else if (official.length > 0) {
-      reason = access.supported
-        ? `Powered by the official TikTok Display API (${access.scope}).`
-        : `Powered by approved access (${access.scope}).`;
-    } else if (mock.length > 0) {
-      reason = `${mock.length} player${mock.length === 1 ? '' : 's'} using clearly-labelled demo data. ${access.note}`;
-    } else if (access.supported) {
-      reason = `Needs at least one TikTok account granting ${access.scope}. ${access.note}`;
+    if (suppliers.length > 0) {
+      reason = reasons[0] ?? 'Powered by real TikTok data from connected accounts.';
     } else {
-      reason = `Not available through TikTok's official API for consumer apps.${access.scope ? ` Would require "${access.scope}".` : ''} ${access.note}`;
+      reason = `No connected player can supply this mode. ${access.note}${
+        access.supported
+          ? ` Requires the ${access.scope} permission.`
+          : access.scope
+            ? ` Would require ${access.scope}.`
+            : ''
+      }`;
     }
 
     availability.push({ mode: modeId, playable: suppliers.length > 0, sources, reason });

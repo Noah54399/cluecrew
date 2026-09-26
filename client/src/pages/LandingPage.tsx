@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BRAND, MODES, MODE_IDS, type PublicServerConfig } from '@shared';
-import { roomsApi, setCsrfToken } from '../lib/api';
+import { roomsApi, sessionApi, setCsrfToken } from '../lib/api';
 import { getIdentity, saveIdentity, savePlayer } from '../lib/storage';
-import { AvatarPicker } from '../components/Avatar';
+import { AvatarPicker, Avatar } from '../components/Avatar';
 import { Badge, Button, Card, Input, Modal } from '../components/ui';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { useSession } from '../app/SessionProvider';
+import { useToast } from '../app/ToastProvider';
 import {
   InfoIcon,
   LinkIcon,
@@ -18,6 +20,8 @@ import {
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const { session } = useSession();
+  const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [apiOpen, setApiOpen] = useState(false);
   const [config, setConfig] = useState<PublicServerConfig | null>(null);
@@ -32,6 +36,18 @@ export function LandingPage() {
       .then(setConfig)
       .catch(() => undefined);
   }, []);
+
+  const connectTikTok = async () => {
+    setBusy(true);
+    try {
+      const { url } = await sessionApi.tiktokStartUrl('/account');
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not start the TikTok sign-in.');
+      setBusy(false);
+    }
+  };
+
 
   const create = async () => {
     const trimmed = name.trim();
@@ -70,6 +86,27 @@ export function LandingPage() {
         <div className="container topnav-inner">
           <Logo />
           <div className="row">
+            {session?.tiktok.linked ? (
+              <Link to="/account" className="chip" title="Manage your TikTok connection">
+                <Avatar
+                  name={session.tiktok.displayName ?? 'TikTok'}
+                  seed={0}
+                  url={session.tiktok.avatarUrl}
+                  size="sm"
+                />
+                TikTok Connected
+              </Link>
+            ) : (
+              <Button
+                variant="mint"
+                size="sm"
+                icon={<LinkIcon size={15} />}
+                disabled={busy || config?.tiktokConfigured === false}
+                onClick={() => void connectTikTok()}
+              >
+                Connect TikTok
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setApiOpen(true)}>
               API status
             </Button>
@@ -147,6 +184,62 @@ export function LandingPage() {
           className="anim-fade-up"
           title={
             <>
+              <LinkIcon size={19} /> Connect your TikTok
+            </>
+          }
+          subtitle="Real data only — ClueCrew never fakes videos, follower counts or statistics."
+        >
+          {session?.tiktok.linked ? (
+            <div className="stack-sm">
+              <div className="row">
+                <Avatar
+                  name={session.tiktok.displayName ?? 'TikTok'}
+                  seed={0}
+                  url={session.tiktok.avatarUrl}
+                  size="md"
+                />
+                <div className="grow">
+                  <div className="setting-label">
+                    {session.tiktok.displayName ?? 'TikTok connected'}
+                  </div>
+                  <div className="faint small">{session.tiktok.scopes.join(', ')}</div>
+                </div>
+                <Badge variant="mint">TikTok Connected</Badge>
+              </div>
+              <Link className="btn btn-outline btn-sm" to="/account">
+                View profile, statistics &amp; videos
+              </Link>
+            </div>
+          ) : (
+            <div className="stack-sm">
+              <p className="muted small">
+                <strong>Connect your TikTok account to see your real data.</strong> Your profile,
+                your public videos and (with TikTok&apos;s permission) your statistics come
+                straight from the official APIs. ClueCrew never asks for your TikTok password.
+              </p>
+              <div className="row wrap">
+                <Button
+                  variant="primary"
+                  icon={<LinkIcon size={17} />}
+                  disabled={busy || config?.tiktokConfigured === false}
+                  onClick={() => void connectTikTok()}
+                >
+                  Continue with TikTok
+                </Button>
+                {config?.tiktokConfigured === false && (
+                  <span className="faint small">
+                    TikTok sign-in is not configured on this server yet.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card
+          className="anim-fade-up"
+          title={
+            <>
               <InfoIcon size={19} /> Game modes &amp; TikTok API status
             </>
           }
@@ -185,7 +278,7 @@ export function LandingPage() {
                         official.supported ? (
                           <Badge variant="mint">Official API · {official.scope}</Badge>
                         ) : (
-                          <Badge variant="amber">Demo data</Badge>
+                          <Badge variant="danger">Not available via API</Badge>
                         )
                       ) : (
                         <Badge>checking…</Badge>

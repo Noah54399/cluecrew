@@ -95,7 +95,6 @@ export interface ServerConfig {
   sessionTtlMs: number;
 
   tokenEncryptionKey: Buffer;
-  allowMockProvider: boolean;
   maxPlayersPerRoom: number;
   hostTransferGraceMs: number;
   roomIdleTimeoutMs: number;
@@ -115,7 +114,6 @@ export interface ConfigOverrides {
   cookieSameSite?: 'Lax' | 'None';
   databasePath?: string;
   serveClient?: boolean;
-  allowMockProvider?: boolean;
   maxPlayersPerRoom?: number;
   hostTransferGraceMs?: number;
   roomIdleTimeoutMs?: number;
@@ -249,9 +247,14 @@ export function loadConfig(overrides: ConfigOverrides = {}): ServerConfig {
 
   const tiktokScopes = [
     ...(overrides.tiktok?.scopes ?? ['user.info.basic', 'video.list']),
+    ...envString('TIKTOK_EXTRA_SCOPES', '')
+      .split(',')
+      .map((scope) => scope.trim())
+      .filter(Boolean),
   ];
-  if (dataPortabilityRequested && !tiktokScopes.includes(dataPortabilityScope)) {
-    tiktokScopes.push(dataPortabilityScope);
+  const uniqueTiktokScopes = [...new Set(tiktokScopes)];
+  if (dataPortabilityRequested && !uniqueTiktokScopes.includes(dataPortabilityScope)) {
+    uniqueTiktokScopes.push(dataPortabilityScope);
   }
 
   const tiktok: TikTokConfig = {
@@ -261,7 +264,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): ServerConfig {
     redirectUri:
       overrides.tiktok?.redirectUri ??
       envFirst(['TIKTOK_REDIRECT_URI'], `${publicUrl}/api/auth/tiktok/callback`),
-    scopes: tiktokScopes,
+    scopes: uniqueTiktokScopes,
   };
 
   const dataPortability: DataPortabilityConfig = {
@@ -313,7 +316,6 @@ export function loadConfig(overrides: ConfigOverrides = {}): ServerConfig {
     roomTtlMs: envInt('ROOM_TTL_HOURS', 12) * 60 * 60 * 1000,
     sessionTtlMs: envInt('SESSION_TTL_DAYS', 30) * 24 * 60 * 60 * 1000,
     tokenEncryptionKey,
-    allowMockProvider: overrides.allowMockProvider ?? envBool('ALLOW_MOCK_PROVIDER', true),
     maxPlayersPerRoom: overrides.maxPlayersPerRoom ?? envInt('MAX_PLAYERS_PER_ROOM', 12),
     hostTransferGraceMs:
       overrides.hostTransferGraceMs ?? envInt('HOST_TRANSFER_GRACE_SECONDS', 30) * 1000,

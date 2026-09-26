@@ -1,4 +1,4 @@
-import express, { type Router } from 'express';
+import express, { type Request, type Router } from 'express';
 import { z } from 'zod';
 import {
   AVATAR_SEED_COUNT,
@@ -14,18 +14,25 @@ import {
   normalizeAvatarSeed,
   sanitizeDisplayName,
   type ActivityImportState,
-  type ContentSourcePreference,
   type PublicServerConfig,
+  type TikTokProfileView,
+  type TikTokVideosView,
 } from '@cluecrew/shared';
 import type { ServerConfig } from '../config.js';
-import type { Repositories, UserRow } from '../database/repositories.js';
+import type { OauthAccountRow, Repositories, UserRow } from '../database/repositories.js';
 import type { SessionService } from '../auth/sessions.js';
 import { TikTokOAuthService } from '../auth/tiktokOAuth.js';
+import { encryptString } from '../lib/crypto.js';
 import { AppError } from '../lib/errors.js';
 import { asyncHandler, rateLimit, requireCsrf } from '../lib/http.js';
 import { SlidingWindowLimiter } from '../lib/rateLimit.js';
 import type { RoomManager } from '../game/roomManager.js';
 import type { DataPortabilityService } from '../portability/DataPortabilityService.js';
+import {
+  clearAccountCache,
+  loadTikTokProfile,
+  loadTikTokVideos,
+} from '../providers/tiktok/accountData.js';
 
 const guestSchema = z.object({
   name: z.string().min(1).max(60),
@@ -93,7 +100,7 @@ export function createApiRouter(deps: ApiDeps): Router {
     const payload: PublicServerConfig = {
       brand: BRAND,
       tiktokConfigured: config.tiktok.configured,
-      mockProviderAllowed: config.allowMockProvider,
+      tiktokScopes: config.tiktok.scopes,
       maxPlayersPerRoom: config.maxPlayersPerRoom,
       settingsLimits: SETTINGS_LIMITS,
       defaultSettings: DEFAULT_SETTINGS,
@@ -120,7 +127,6 @@ export function createApiRouter(deps: ApiDeps): Router {
   const sessionPayload = (user: UserRow | null, csrfToken: string | null) => ({
     user: null as null | { id: string; displayName: string; avatarSeed: number },
     csrfToken,
-    preference: (user?.preferredSource ?? 'auto') as ContentSourcePreference,
     tiktok: {
       configured: config.tiktok.configured,
       ...(user
@@ -138,7 +144,6 @@ export function createApiRouter(deps: ApiDeps): Router {
     import:
       user && dataPortability ? dataPortability.getState(user.id) : emptyImportState(),
     server: {
-      mockProviderAllowed: config.allowMockProvider,
       avatarSeedCount: AVATAR_SEED_COUNT,
     },
   });
@@ -155,27 +160,6 @@ export function createApiRouter(deps: ApiDeps): Router {
     }
     res.json(payload);
   });
-
-  router.post(
-    '/session/preference',
-    requireCsrf(sessions),
-    asyncHandler((req, res) => {
-      const auth = sessions.getAuth(req);
-      if (!auth) throw new AppError('UNAUTHORIZED');
-      const value = (req.body ?? {}).preference;
-      if (value !== 'auto' && value !== 'real' && value !== 'mock') {
-        throw new AppError('VALIDATION_FAILED', {
-          message: 'Preference must be one of: auto, real, mock.',
-        });
-      }
-      repos.users.update(auth.user.id, {
-        preferredSource: value,
-        now: new Date().toISOString(),
-      });
-      roomManager.refreshUserSources(auth.user.id);
-      res.json({ ok: true, preference: value });
-    }),
-  );
 
   router.post(
     '/session/guest',
@@ -247,8 +231,13 @@ export function createApiRouter(deps: ApiDeps): Router {
     requireCsrf(sessions),
     asyncHandler((req, res) => {
       if (!oauth.isConfigured()) throw new AppError('TIKTOK_NOT_CONFIGURED');
-      const auth = sessions.getAuth(req);
-      if (!auth) throw new AppError('UNAUTHORIZED');
+      // First-time visitors can connect immediately: create a guest session
+      // on the fly (the TikTok profile becomes their identity, no name prompt).
+      let auth = sessions.getAuth(req);
+      if (!auth) {
+        auth = sessions.createUserWithSession({ displayName: 'TikTok user', avatarSeed: 0 });
+        sessions.attachSessionCookie(res, auth.session);
+      }
       const url = oauth.createAuthorizeUrl({
         userId: auth.user.id,
         returnTo: (req.body ?? {}).returnTo,
@@ -262,8 +251,11 @@ export function createApiRouter(deps: ApiDeps): Router {
     rateLimit(oauthLimiter, 'oauth'),
     asyncHandler((req, res) => {
       if (!oauth.isConfigured()) throw new AppError('TIKTOK_NOT_CONFIGURED');
-      const auth = sessions.getAuth(req);
-      if (!auth) throw new AppError('UNAUTHORIZED', { message: 'Set a display name before connecting TikTok.' });
+      let auth = sessions.getAuth(req);
+      if (!auth) {
+        auth = sessions.createUserWithSession({ displayName: 'TikTok user', avatarSeed: 0 });
+        sessions.attachSessionCookie(res, auth.session);
+      }
       const url = oauth.createAuthorizeUrl({
         userId: auth.user.id,
         returnTo: req.query.returnTo,
@@ -294,6 +286,7 @@ export function createApiRouter(deps: ApiDeps): Router {
       const auth = sessions.getAuth(req);
       if (!auth) throw new AppError('UNAUTHORIZED');
       await oauth.disconnect(auth.user.id);
+      clearAccountCache(auth.user.id);
       res.json({ ok: true, tiktok: oauth.getLinkedAccount(auth.user.id) });
     }),
   );
@@ -380,6 +373,121 @@ export function createApiRouter(deps: ApiDeps): Router {
         csrfToken: auth.session.csrfToken,
         room: roomManager.getPublicRoomInfo(room.code),
       });
+    }),
+  );
+
+  // -------------------------------------------------------------------------
+  // TikTok account data (real Display API data for the account page)
+  // -------------------------------------------------------------------------
+
+  const persistRefreshedTokens =
+    (account: OauthAccountRow) =>
+    (tokens: {
+      accessToken: string;
+      refreshToken: string | null;
+      accessTokenExpiresAt: number;
+      refreshTokenExpiresAt: number | null;
+      scopes: string[];
+    }) => {
+      try {
+        repos.oauthAccounts.updateTokens(account.id, {
+          accessTokenEnc: encryptString(tokens.accessToken, config.tokenEncryptionKey),
+          refreshTokenEnc: tokens.refreshToken
+            ? encryptString(tokens.refreshToken, config.tokenEncryptionKey)
+            : null,
+          accessTokenExpiresAt: new Date(tokens.accessTokenExpiresAt).toISOString(),
+          refreshTokenExpiresAt: tokens.refreshTokenExpiresAt
+            ? new Date(tokens.refreshTokenExpiresAt).toISOString()
+            : null,
+          scopes: tokens.scopes.join(','),
+          now: new Date().toISOString(),
+        });
+      } catch {
+        // Token persistence is best-effort.
+      }
+    };
+
+  const notConnectedProfile = (message: string): TikTokProfileView => ({
+    connected: false,
+    needsReconnect: false,
+    openId: null,
+    displayName: null,
+    avatarUrl: null,
+    username: null,
+    bioDescription: null,
+    profileDeepLink: null,
+    isVerified: null,
+    stats: null,
+    scopesRequested: config.tiktok.scopes,
+    scopesGranted: [],
+    scopesMissing: config.tiktok.scopes,
+    unavailable: [],
+    connectedAt: null,
+    accessTokenExpiresAt: null,
+    message,
+  });
+
+  const emptyVideos = (reason: string): TikTokVideosView => ({
+    available: false,
+    needsReconnect: false,
+    reason,
+    requiredScope: 'video.list',
+    videos: [],
+  });
+
+  const tiktokAccountFor = (req: Request) => {
+    const auth = sessions.getAuth(req);
+    if (!auth) return null;
+    return repos.oauthAccounts.getForUser(auth.user.id, 'tiktok');
+  };
+
+  router.get(
+    '/tiktok/profile',
+    rateLimit(importLimiter, 'account'),
+    asyncHandler(async (req, res) => {
+      if (!config.tiktok.configured) {
+        res.json(
+          notConnectedProfile(
+            'TikTok sign-in is not configured on this server, so real data is unavailable.',
+          ),
+        );
+        return;
+      }
+      const account = tiktokAccountFor(req);
+      if (!account) {
+        res.json(notConnectedProfile('Connect your TikTok account to see your real data.'));
+        return;
+      }
+      const profile = await loadTikTokProfile({
+        account,
+        config,
+        onTokensRefreshed: persistRefreshedTokens(account),
+      });
+      res.json(profile);
+    }),
+  );
+
+  router.get(
+    '/tiktok/videos',
+    rateLimit(importLimiter, 'account'),
+    asyncHandler(async (req, res) => {
+      if (!config.tiktok.configured) {
+        res.json(emptyVideos('TikTok sign-in is not configured on this server.'));
+        return;
+      }
+      const account = tiktokAccountFor(req);
+      if (!account) {
+        res.json(emptyVideos('Connect your TikTok account to see your real data.'));
+        return;
+      }
+      const limitRaw = typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : 20;
+      const videos = await loadTikTokVideos({
+        account,
+        config,
+        limit: Number.isFinite(limitRaw) ? limitRaw : 20,
+        onTokensRefreshed: persistRefreshedTokens(account),
+      });
+      res.json(videos);
     }),
   );
 

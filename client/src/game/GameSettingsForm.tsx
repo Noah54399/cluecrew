@@ -73,9 +73,9 @@ export function GameSettingsForm({
       <div>
         <div className="setting-label">Game modes</div>
         <div className="setting-desc" style={{ maxWidth: 'none' }}>
-          Modes labelled <strong>Demo data</strong> are playable immediately with clearly-labelled demo
-          content. <strong>TikTok API</strong> modes use real data from connected accounts. Unavailable
-          modes need permissions TikTok does not grant consumer apps — they are never faked.
+          Modes only appear when a connected player can supply real content. Modes marked{' '}
+          <strong>Unavailable</strong> need a TikTok permission this app does not have (or nobody
+          connected has granted) — they are never filled with fake data.
         </div>
         <div className="mode-toggle-list">
           {MODE_IDS.map((modeId) => {
@@ -111,12 +111,7 @@ export function GameSettingsForm({
                   <span className="mode-toggle-title">
                     {mode.title}
                     {!playable && <Badge variant="danger">Unavailable</Badge>}
-                    {playable && entry?.sources.includes('official_api') && (
-                      <Badge variant="mint">TikTok API</Badge>
-                    )}
-                    {playable && entry?.sources.includes('mock') && (
-                      <Badge variant="amber">Demo data</Badge>
-                    )}
+                    {playable && <Badge variant="mint">Real TikTok data</Badge>}
                   </span>
                   <span className="mode-toggle-note">{entry?.reason ?? mode.description}</span>
                 </span>

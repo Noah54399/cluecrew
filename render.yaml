@@ -32,12 +32,13 @@ services:
       # Rooms are ephemeral by design; see docs/DEPLOYMENT.md for options.
       - key: DATABASE_PATH
         value: ./data/cluecrew.sqlite
-      - key: ALLOW_MOCK_PROVIDER
-        value: 'true'
-      # Optional TikTok integration: add TIKTOK_CLIENT_KEY /
-      # TIKTOK_CLIENT_SECRET in the dashboard after creating a TikTok developer
-      # app. The callback URL to register is always:
+      # TikTok integration: add TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET in the
+      # dashboard after creating a TikTok developer app (Login Kit + Display API).
+      # The callback URL to register there is always:
       #   https://<your-service>.onrender.com/api/auth/tiktok/callback
+      # Once TikTok approves extra scopes (user.info.profile / user.info.stats),
+      # add them here as a comma separated list:
+      #   TIKTOK_EXTRA_SCOPES = user.info.profile,user.info.stats
       # Only enable Data Portability after TikTok approves it:
       - key: TIKTOK_DATAPORTABILITY_ENABLED
         value: 'false'

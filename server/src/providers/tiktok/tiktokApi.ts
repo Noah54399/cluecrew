@@ -22,8 +22,27 @@ export interface TikTokUserInfo {
   open_id: string;
   union_id?: string;
   avatar_url?: string;
+  avatar_url_100?: string;
+  avatar_large_url?: string;
   display_name?: string;
+  /** user.info.profile */
+  username?: string;
+  bio_description?: string;
+  profile_deep_link?: string;
+  is_verified?: boolean;
+  /** user.info.stats */
+  follower_count?: number;
+  following_count?: number;
+  likes_count?: number;
+  video_count?: number;
 }
+
+/** Field groups documented per scope for GET /v2/user/info/. */
+export const USER_INFO_FIELDS = {
+  basic: ['open_id', 'union_id', 'avatar_url', 'display_name'],
+  profile: ['username', 'bio_description', 'profile_deep_link', 'is_verified'],
+  stats: ['follower_count', 'following_count', 'likes_count', 'video_count'],
+} as const;
 
 export interface TikTokVideo {
   id: string;
@@ -34,6 +53,10 @@ export interface TikTokVideo {
   share_url?: string;
   embed_link?: string;
   create_time?: number;
+  like_count?: number;
+  comment_count?: number;
+  share_count?: number;
+  view_count?: number;
 }
 
 interface TikTokApiEnvelope<T> {
@@ -154,11 +177,14 @@ export async function revokeAccessToken(params: {
   });
 }
 
-export async function fetchUserInfo(accessToken: string): Promise<TikTokUserInfo> {
+export async function fetchUserInfo(
+  accessToken: string,
+  fields: readonly string[] = USER_INFO_FIELDS.basic,
+): Promise<TikTokUserInfo> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const url = `${API_BASE}/v2/user/info/?fields=open_id,union_id,avatar_url,display_name`;
+    const url = `${API_BASE}/v2/user/info/?fields=${fields.join(',')}`;
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: controller.signal,
@@ -166,6 +192,17 @@ export async function fetchUserInfo(accessToken: string): Promise<TikTokUserInfo
     if (response.status === 429) throw new ProviderRateLimitError();
     const envelope = (await response.json().catch(() => ({}))) as TikTokApiEnvelope<{ user: TikTokUserInfo }>;
     if (!response.ok) {
+      const code = (envelope.error?.code ?? '').toLowerCase();
+      if (response.status === 401 || code.includes('token')) {
+        throw new ProviderAuthError(
+          envelope.error?.message && envelope.error.message.length > 0
+            ? envelope.error.message
+            : 'TikTok rejected the stored authorization. Please reconnect your account.',
+        );
+      }
+      if (code.includes('scope') || code.includes('permission')) {
+        throw new ProviderScopeMissingError('video.list');
+      }
       throw new ProviderApiError(`TikTok user info failed with HTTP ${response.status}.`);
     }
     const data = assertOk(envelope, '/v2/user/info/');
@@ -203,7 +240,8 @@ export async function fetchUserVideos(params: {
   while (videos.length < wanted && pages < 4) {
     pages += 1;
     const query = new URLSearchParams({
-      fields: 'id,title,video_description,duration,cover_image_url,share_url,embed_link,create_time',
+      fields:
+        'id,title,video_description,duration,cover_image_url,share_url,embed_link,create_time,like_count,comment_count,share_count,view_count',
     });
     const body: Record<string, unknown> = { max_count: Math.min(maxPerPage, wanted - videos.length) };
     if (cursor !== undefined) body.cursor = cursor;
@@ -227,6 +265,17 @@ export async function fetchUserVideos(params: {
         has_more: boolean;
       }>;
       if (!response.ok) {
+        const code = (envelope.error?.code ?? '').toLowerCase();
+        if (response.status === 401 || code.includes('token')) {
+          throw new ProviderAuthError(
+            envelope.error?.message && envelope.error.message.length > 0
+              ? envelope.error.message
+              : 'TikTok rejected the stored authorization. Please reconnect your account.',
+          );
+        }
+        if (code.includes('scope') || code.includes('permission')) {
+          throw new ProviderScopeMissingError('video.list');
+        }
         throw new ProviderApiError(`TikTok video list failed with HTTP ${response.status}.`);
       }
       const data = assertOk(envelope, '/v2/video/list/');

@@ -35,7 +35,7 @@ function mkPlayer(id: string, options: { connected?: boolean; joinedAt?: number 
     avatarUrl: null,
     isHost: false,
     connected,
-    source: 'mock',
+    source: 'tiktok',
     socketCount: connected ? 1 : 0,
     joinedAt: options.joinedAt ?? 0,
     lastSeenAt: 0,

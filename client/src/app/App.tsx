@@ -6,6 +6,7 @@ import { useSession } from './SessionProvider';
 import { LandingPage } from '../pages/LandingPage';
 import { JoinPage } from '../pages/JoinPage';
 import { RoomPage } from '../pages/RoomPage';
+import { AccountPage } from '../pages/AccountPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function App() {
@@ -41,6 +42,7 @@ export function App() {
       <Route path="/join" element={<JoinPage />} />
       <Route path="/join/:code" element={<JoinPage />} />
       <Route path="/room/:code" element={<RoomPage />} />
+      <Route path="/account" element={<AccountPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

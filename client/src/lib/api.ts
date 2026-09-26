@@ -1,10 +1,11 @@
 import type {
   ActivityImportState,
-  ContentSourcePreference,
   CreateRoomResult,
   JoinRoomResult,
   PublicRoomInfo,
   PublicServerConfig,
+  TikTokProfileView,
+  TikTokVideosView,
 } from '@shared';
 
 /**
@@ -83,7 +84,6 @@ export const api = {
 export interface SessionPayload {
   user: { id: string; displayName: string; avatarSeed: number } | null;
   csrfToken: string | null;
-  preference: ContentSourcePreference;
   tiktok: {
     configured: boolean;
     linked: boolean;
@@ -96,7 +96,6 @@ export interface SessionPayload {
   };
   import: ActivityImportState;
   server: {
-    mockProviderAllowed: boolean;
     avatarSeedCount: number;
   };
 }
@@ -111,13 +110,15 @@ export const sessionApi = {
     api.post<SessionPayload>('/api/session/guest', { name, avatarSeed }),
   logout: () => api.delete<{ ok: boolean }>('/api/session'),
   deleteMe: () => api.delete<{ ok: boolean }>('/api/me'),
-  setPreference: (preference: ContentSourcePreference) =>
-    api.post<{ ok: boolean; preference: ContentSourcePreference }>('/api/session/preference', {
-      preference,
-    }),
   tiktokStartUrl: (returnTo: string) =>
     api.post<{ url: string }>('/api/auth/tiktok/start-url', { returnTo }),
   tiktokDisconnect: () => api.post<{ ok: boolean }>('/api/auth/tiktok/disconnect'),
+};
+
+/** Real TikTok account data (Display API). Nothing here is ever mocked. */
+export const tiktokAccountApi = {
+  profile: () => api.get<TikTokProfileView>('/api/tiktok/profile'),
+  videos: (limit = 20) => api.get<TikTokVideosView>(`/api/tiktok/videos?limit=${limit}`),
 };
 
 export const tiktokImportApi = {

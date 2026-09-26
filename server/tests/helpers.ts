@@ -15,6 +15,7 @@ import { createApp } from '../src/app.js';
 import { createSocketServer } from '../src/realtime/socket.js';
 import { mulberry32 } from '../src/lib/rng.js';
 import { DataPortabilityService } from '../src/portability/DataPortabilityService.js';
+import { TestSocialProvider } from './testProvider.js';
 import type {
   AddDataRequestParams,
   AddDataRequestResult,
@@ -92,7 +93,6 @@ export async function createTestContext(overrides: ConfigOverrides = {}): Promis
   const config = loadConfig({
     nodeEnv: 'test',
     databasePath: ':memory:',
-    allowMockProvider: true,
     publicUrl: 'http://127.0.0.1',
     clientUrl: 'http://127.0.0.1',
     allowedOrigins: ['http://localhost', 'http://127.0.0.1'],
@@ -130,6 +130,13 @@ export async function createTestContext(overrides: ConfigOverrides = {}): Promis
     repos,
     deps: { now: () => Date.now(), rng: mulberry32(1234), timings: config.timings },
     dataPortability,
+    // Tests inject a deterministic provider double; production never does.
+    providerFactory: (params) =>
+      new TestSocialProvider({
+        playerKey: params.playerKey,
+        playerName: params.playerName,
+        avatarSeed: params.avatarSeed,
+      }),
   });
   const app = createApp({ config, repos, sessions, oauth, roomManager, dataPortability });
   const httpServer = createServer(app);
@@ -347,13 +354,13 @@ export function emitWithAck<T = unknown>(
 
 export function makeContent(contentId: string, kind: ActionKind = 'like'): ContentItem {
   return {
-    provider: 'mock',
+    provider: 'tiktok',
     kind,
     contentId,
     title: `clip ${contentId}`,
     coverUrl: null,
     webUrl: null,
-    authorName: '@demo',
+    authorName: '@test',
     createdAt: 0,
   };
 }

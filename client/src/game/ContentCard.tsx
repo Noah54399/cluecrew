@@ -7,7 +7,7 @@ export function ContentCard({ content, revealed = false }: { content: ContentVie
   return (
     <div className="content-card anim-pop">
       <div className="content-badges">
-        {content.isMock ? <Badge variant="amber">Demo data</Badge> : <Badge variant="mint">TikTok</Badge>}
+        <Badge variant="mint">TikTok</Badge>
         <Badge>{content.kind.toUpperCase()}</Badge>
       </div>
       {content.coverUrl ? (

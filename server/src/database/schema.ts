@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS game_players (
   avatar_url TEXT,
   reconnect_token_hash TEXT NOT NULL,
   is_host INTEGER NOT NULL DEFAULT 0,
-  source TEXT NOT NULL DEFAULT 'mock',
+  source TEXT NOT NULL DEFAULT 'none',
   joined_at TEXT NOT NULL,
   last_seen_at TEXT NOT NULL
 );

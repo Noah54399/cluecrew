@@ -139,8 +139,9 @@ Never commit real values. On Render set secrets in the dashboard; `render.yaml` 
 5. Start a game, answer rounds, watch the reveal and leaderboard stay in sync.
 6. Lock the phone / reload a tab mid-game → player reconnects with the same state.
 7. Finish the game → **Play again** starts a new game without reconnecting.
-8. `npm run smoke` against the deployed URL if you want an automated pass
-   (`npm run simulate -- https://<service> 5 3` uses real WebSockets).
+8. `node scripts/smoke.mjs --url https://<service>` runs the automated checks against the
+   deployed instance: health, client build, cookies/CORS, room creation and the real-data guard.
+   A complete game requires players with connected TikTok accounts (ClueCrew ships no demo data).
 
 ## Troubleshooting
 

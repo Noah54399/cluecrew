@@ -8,7 +8,7 @@ import { randomId } from '../src/lib/ids.js';
 import type { OauthAccountRow, SocialActionRow } from '../src/database/repositories.js';
 import { parseExportArchive } from '../src/portability/exportParser.js';
 import { createSocialProvider } from '../src/providers/factory.js';
-import { MockSocialProvider } from '../src/providers/mock/MockSocialProvider.js';
+import { DisconnectedSocialProvider } from '../src/providers/DisconnectedSocialProvider.js';
 import { TikTokDataPortabilityProvider } from '../src/providers/tiktok/TikTokDataPortabilityProvider.js';
 import {
   ProviderApiError,
@@ -525,7 +525,30 @@ describe('provider abstraction with Data Portability data', () => {
     }
   });
 
-  it('keeps the mock provider working (the development switch)', async () => {
+  it('falls back to the disconnected provider when no TikTok account is linked', async () => {
+    const ctx = await createTestContext({ ...DP_CONFIG });
+    try {
+      const provider = createSocialProvider({
+        playerKey: 'p1',
+        playerName: 'Nova',
+        avatarSeed: 0,
+        account: null,
+        config: ctx.config,
+      });
+      expect(provider).toBeInstanceOf(DisconnectedSocialProvider);
+      const capabilities = provider.getCapabilities();
+      expect(capabilities.like.available).toBe(false);
+      expect(capabilities.post.available).toBe(false);
+      expect(capabilities.like.reason).toMatch(/Connect your TikTok account/i);
+      await expect(provider.getAvailableLikedContent(3)).rejects.toMatchObject({
+        code: 'CONTENT_UNAVAILABLE',
+      });
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('never serves demo content: a linked account without portability only offers its own videos', async () => {
     const ctx = await createTestContext({ ...DP_CONFIG });
     try {
       const { user } = createUser(ctx);
@@ -535,36 +558,16 @@ describe('provider abstraction with Data Portability data', () => {
         avatarSeed: 0,
         account: makeAccount(ctx, user.id),
         config: ctx.config,
-        preference: 'mock',
       });
-      expect(provider).toBeInstanceOf(MockSocialProvider);
+      expect(provider).not.toBeInstanceOf(DisconnectedSocialProvider);
       const capabilities = provider.getCapabilities();
-      expect(capabilities.like.available).toBe(true);
-      expect(capabilities.like.reason).toMatch(/demo data/i);
-      const items = await provider.getAvailableLikedContent(3);
-      expect(items).toHaveLength(3);
+      // Display API: own public videos yes; likes/saves need the Data Portability import.
+      expect(capabilities.post.available).toBe(true);
+      expect(capabilities.like.available).toBe(false);
+      expect(capabilities.like.reason).toMatch(/official API|portability|not expose/i);
     } finally {
       await ctx.close();
     }
-  });
-
-  it('serves nothing fake when the player insists on real data without a connection', () => {
-    const config = loadConfig({
-      tiktok: { clientKey: 'k', clientSecret: 's' },
-      dataPortability: { enabled: true },
-    });
-    const provider = createSocialProvider({
-      playerKey: 'p1',
-      playerName: 'Nova',
-      avatarSeed: 0,
-      account: null,
-      config,
-      preference: 'real',
-    });
-    expect(provider).toBeInstanceOf(MockSocialProvider);
-    const capabilities = provider.getCapabilities();
-    expect(capabilities.like.available).toBe(false);
-    expect(capabilities.like.reason).toMatch(/no TikTok account/i);
   });
 
   it('reports honest reasons while an import is still pending', () => {

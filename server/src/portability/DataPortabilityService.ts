@@ -132,7 +132,7 @@ export class DataPortabilityService {
     }
     const categories = this.config.dataPortability.categories;
     if (!categories.includes('all_data')) {
-      return `The "${categories.join(', ')}" export does not include liked or favourite videos — TikTok only provides those in the full data archive (all-data scope). Liked/saved modes stay on demo data until the app is approved for the all-data scope.`;
+      return `The "${categories.join(', ')}" export does not include liked or favourite videos — TikTok only provides those in the full data archive (all-data scope). Liked/saved modes stay unavailable until the app is approved for the all-data scope.`;
     }
     if (state.status === 'pending') {
       return 'TikTok is preparing your data. This can take seconds, minutes or hours — TikTok decides. You can leave this screen open; it updates automatically.';

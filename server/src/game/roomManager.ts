@@ -7,7 +7,6 @@ import {
   normalizeAvatarSeed,
   type ActionKind,
   type ClientToServerEvents,
-  type ContentSourcePreference,
   type ContentView,
   type GameSettings,
   type LeaderboardEntry,
@@ -28,8 +27,7 @@ import { appEvents } from '../lib/events.js';
 import { randomId, randomRoomCode, randomSecretToken } from '../lib/ids.js';
 import { buildProxiedMediaUrl } from '../lib/mediaProxy.js';
 import { createLogger, type Logger } from '../lib/logger.js';
-import { createSocialProvider, type ProviderImportData } from '../providers/factory.js';
-import type { ContentItem, ProviderCapabilities, SocialProvider } from '../providers/types.js';
+import { defaultSocialProviderFactory, type ProviderImportData, type SocialProviderFactory } from '../providers/factory.js';import type { ContentItem, ProviderCapabilities, SocialProvider } from '../providers/types.js';
 import type { DataPortabilityService } from '../portability/DataPortabilityService.js';
 import {
   ProviderAuthError,
@@ -95,6 +93,8 @@ export interface RoomManagerOptions {
   logger?: Logger;
   /** Optional: enables real TikTok activity data for linked players. */
   dataPortability?: DataPortabilityService | null;
+  /** Injectable provider factory (production default uses real TikTok only). */
+  providerFactory?: SocialProviderFactory;
 }
 
 export interface CreatedPlayer {
@@ -120,6 +120,7 @@ export class RoomManager {
   private readonly deps: EngineDeps;
   private readonly logger: Logger;
   private readonly dataPortability: DataPortabilityService | null;
+  private readonly providerFactory: SocialProviderFactory;
 
   private rooms = new Map<string, EngineRoom>();
   private roomIdByCode = new Map<string, string>();
@@ -139,6 +140,7 @@ export class RoomManager {
     this.deps = options.deps;
     this.logger = options.logger ?? createLogger('rooms');
     this.dataPortability = options.dataPortability ?? null;
+    this.providerFactory = options.providerFactory ?? defaultSocialProviderFactory;
 
     this.unsubscribe = [
       appEvents.on('tiktok:linked', ({ userId }) =>
@@ -223,7 +225,7 @@ export class RoomManager {
       avatarUrl: null,
       reconnectTokenHash: sha256Hex(playerToken),
       isHost: 1,
-      source: 'mock',
+      source: 'none',
       now: nowIso,
     });
 
@@ -235,7 +237,7 @@ export class RoomManager {
       avatarUrl: null,
       isHost: true,
       connected: false,
-      source: 'mock',
+      source: 'none',
       socketCount: 0,
       joinedAt: now,
       lastSeenAt: now,
@@ -273,7 +275,7 @@ export class RoomManager {
       avatarUrl: null,
       reconnectTokenHash: sha256Hex(playerToken),
       isHost: 0,
-      source: 'mock',
+      source: 'none',
       now: nowIso,
     });
 
@@ -285,7 +287,7 @@ export class RoomManager {
       avatarUrl: null,
       isHost: false,
       connected: false,
-      source: 'mock',
+      source: 'none',
       socketCount: 0,
       joinedAt: now,
       lastSeenAt: now,
@@ -477,7 +479,7 @@ export class RoomManager {
     if (eligibleModes.length === 0) {
       throw new AppError('TOO_FEW_CONTENT_SOURCES', {
         message:
-          'None of the selected modes can be supplied. Enable demo data or connect a TikTok account with the video.list permission.',
+          'Nobody in this room can supply content for the selected modes yet. Players need to connect their TikTok account first (Display API for "Who Posted This?", Data Portability approval for liked/saved videos).',
       });
     }
     const skippedModes = room.settings.enabledModes.filter(
@@ -560,7 +562,7 @@ export class RoomManager {
               kind,
               contentId: content.contentId,
               contentJson: JSON.stringify(content),
-              isMock: content.provider === 'mock' ? 1 : 0,
+              isMock: 0,
               now: nowIso,
             });
 
@@ -845,7 +847,6 @@ export class RoomManager {
       coverUrl: item.coverUrl ? buildProxiedMediaUrl(item.coverUrl, this.config) : null,
       webUrl: hideAuthor ? null : item.webUrl,
       authorName: hideAuthor ? null : item.authorName,
-      isMock: item.provider === 'mock',
       createdAt: item.createdAt,
     };
   }
@@ -1084,34 +1085,25 @@ export class RoomManager {
       : null;
 
     let importData: ProviderImportData | null = null;
-    let preference: ContentSourcePreference = 'auto';
-    if (player.userId) {
-      const user = this.repos.users.get(player.userId);
-      const stored = user?.preferredSource;
-      if (stored === 'real' || stored === 'mock' || stored === 'auto') {
-        preference = stored;
-      }
-      if (this.dataPortability) {
-        const state = this.dataPortability.getState(player.userId);
-        if (state.scopeGranted) {
-          importData = {
-            state,
-            actions: this.repos.socialActions.listForUser(
-              player.userId,
-              this.config.dataPortability.maxActions,
-            ),
-          };
-        }
+    if (player.userId && this.dataPortability) {
+      const state = this.dataPortability.getState(player.userId);
+      if (state.scopeGranted) {
+        importData = {
+          state,
+          actions: this.repos.socialActions.listForUser(
+            player.userId,
+            this.config.dataPortability.maxActions,
+          ),
+        };
       }
     }
 
-    const provider = createSocialProvider({
+    const provider = this.providerFactory({
       playerKey: player.id,
       playerName: player.name,
       avatarSeed: player.avatarSeed,
       account,
       config: this.config,
-      preference,
       dataPortability: importData,
       onTokensRefreshed: (tokens) => {
         if (!account) return;
@@ -1207,11 +1199,6 @@ export class RoomManager {
     this.contentContexts.delete(playerId);
     this.refreshContentSources(room);
     this.handleEffects(room, [{ type: 'persist_room' }]);
-  }
-
-  /** Rebuilds provider contexts for a user in every live room (silent). */
-  refreshUserSources(userId: string): void {
-    this.handleAccountChange(userId, 'import');
   }
 
   /** Called when a user deletes their account: removes them from every live room. */
@@ -1321,7 +1308,7 @@ export class RoomManager {
         avatarUrl: playerRow.avatarUrl,
         isHost: playerRow.isHost === 1,
         connected: false,
-        source: (playerRow.source === 'tiktok' ? 'tiktok' : 'mock') as EnginePlayer['source'],
+        source: (playerRow.source === 'tiktok' ? 'tiktok' : 'none') as EnginePlayer['source'],
         socketCount: 0,
         joinedAt: Date.parse(playerRow.joinedAt),
         lastSeenAt: Date.parse(playerRow.lastSeenAt),

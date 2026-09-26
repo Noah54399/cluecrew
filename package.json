@@ -18,7 +18,6 @@
     "start": "npm --workspace @cluecrew/server run start",
     "test": "npm --workspace @cluecrew/server run test",
     "test:watch": "npm --workspace @cluecrew/server run test:watch",
-    "simulate": "node scripts/simulate-game.mjs",
     "smoke": "node scripts/smoke.mjs",
     "typecheck": "npm --workspace @cluecrew/server run typecheck && npm --workspace @cluecrew/client run typecheck"
   }

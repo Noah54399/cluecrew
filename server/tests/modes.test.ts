@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { MODE_IDS } from '@cluecrew/shared';
 import { computeRoomModeSupport } from '../src/game/modes.js';
-import { MockSocialProvider } from '../src/providers/mock/MockSocialProvider.js';
+import { DisconnectedSocialProvider } from '../src/providers/DisconnectedSocialProvider.js';
 import { TikTokProvider } from '../src/providers/tiktok/TikTokProvider.js';
+import { TestSocialProvider } from './testProvider.js';
 
-function mockInfo(playerId: string) {
-  const provider = new MockSocialProvider({
+function connectedInfo(playerId: string) {
+  const provider = new TestSocialProvider({
     playerKey: playerId,
-    displayName: playerId,
+    playerName: playerId,
     avatarSeed: 0,
-    enabled: true,
   });
-  return { playerId, source: 'mock' as const, capabilities: provider.getCapabilities() };
+  return { playerId, source: 'tiktok' as const, capabilities: provider.getCapabilities() };
+}
+
+function disconnectedInfo(playerId: string) {
+  const provider = new DisconnectedSocialProvider();
+  return { playerId, source: 'none' as const, capabilities: provider.getCapabilities() };
 }
 
 function tiktokInfo(playerId: string, scopes: string[]) {
@@ -35,53 +40,49 @@ function tiktokInfo(playerId: string, scopes: string[]) {
   return { playerId, source: 'tiktok' as const, capabilities: provider.getCapabilities() };
 }
 
-describe('mode support computation', () => {
-  it('marks every mode playable when demo players are present', () => {
-    const support = computeRoomModeSupport([mockInfo('p1'), mockInfo('p2')]);
+describe('mode support computation (real data only)', () => {
+  it('marks modes playable when connected players can supply them', () => {
+    const support = computeRoomModeSupport([connectedInfo('p1'), connectedInfo('p2')]);
     for (const mode of MODE_IDS) {
       expect(support.suppliersByMode[mode]).toHaveLength(2);
     }
     expect(support.modesWithSuppliers).toEqual([...MODE_IDS]);
     for (const availability of support.availability) {
       expect(availability.playable).toBe(true);
-      expect(availability.sources).toContain('mock');
-      expect(availability.reason).toMatch(/demo data/i);
+      expect(availability.sources).toContain('official_api');
     }
   });
 
   it('only offers who_posted for a TikTok player with video.list', () => {
     const support = computeRoomModeSupport([
       tiktokInfo('p1', ['user.info.basic', 'video.list']),
-      mockInfo('p2'),
+      disconnectedInfo('p2'),
     ]);
-    expect(support.suppliersByMode.who_posted).toEqual(['p1', 'p2']);
-    expect(support.suppliersByMode.who_liked).toEqual(['p2']);
-    expect(support.suppliersByMode.who_reposted).toEqual(['p2']);
-    expect(support.suppliersByMode.who_saved).toEqual(['p2']);
+    expect(support.suppliersByMode.who_posted).toEqual(['p1']);
+    expect(support.suppliersByMode.who_liked).toEqual([]);
+    expect(support.suppliersByMode.who_reposted).toEqual([]);
+    expect(support.suppliersByMode.who_saved).toEqual([]);
   });
 
-  it('reports modes as unavailable when nobody can supply them', () => {
-    const support = computeRoomModeSupport([tiktokInfo('p1', ['user.info.basic'])]);
-    expect(support.suppliersByMode.who_liked).toHaveLength(0);
-    expect(support.suppliersByMode.who_posted).toHaveLength(0);
+  it('reports modes as unavailable when nobody is connected', () => {
+    const support = computeRoomModeSupport([disconnectedInfo('p1'), disconnectedInfo('p2')]);
     expect(support.modesWithSuppliers).toHaveLength(0);
+    for (const availability of support.availability) {
+      expect(availability.playable).toBe(false);
+      expect(availability.reason).toMatch(/no connected player/i);
+    }
     const liked = support.availability.find((entry) => entry.mode === 'who_liked')!;
-    expect(liked.playable).toBe(false);
     expect(liked.sources).toContain('special_approval');
-    expect(liked.reason).toMatch(/official API/i);
+    expect(liked.reason).toMatch(/portability/i);
     const posted = support.availability.find((entry) => entry.mode === 'who_posted')!;
-    expect(posted.playable).toBe(false);
     expect(posted.reason).toMatch(/video\.list/);
   });
 
-  it('labels mixed rooms honestly', () => {
-    const support = computeRoomModeSupport([
-      tiktokInfo('real', ['user.info.basic', 'video.list']),
-      mockInfo('demo'),
-    ]);
+  it('says exactly which permission a connected account is missing', () => {
+    const support = computeRoomModeSupport([tiktokInfo('p1', ['user.info.basic'])]);
     const posted = support.availability.find((entry) => entry.mode === 'who_posted')!;
-    expect(posted.sources).toContain('official_api');
-    expect(posted.sources).toContain('mock');
-    expect(posted.reason).toMatch(/real TikTok data/i);
+    expect(posted.playable).toBe(false);
+    expect(posted.reason).toMatch(/video\.list/);
+    expect(support.modesWithSuppliers).toHaveLength(0);
   });
 });

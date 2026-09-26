@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import type {
   ActivityImportState,
-  ContentSourcePreference,
   GameSettings,
   PublicServerConfig,
   RoomState,
@@ -29,13 +28,11 @@ export function LobbyView({
   config,
   tiktok,
   importState,
-  preference,
   onSettings,
   onStart,
   onLeave,
   onConnectTikTok,
   onDisconnectTikTok,
-  onPreferenceChange,
   onImportStateChange,
   busy,
 }: {
@@ -44,13 +41,11 @@ export function LobbyView({
   config: PublicServerConfig | null;
   tiktok: SessionPayload['tiktok'] | null;
   importState: ActivityImportState;
-  preference: ContentSourcePreference;
   onSettings: (patch: Partial<GameSettings>) => void;
   onStart: () => void;
   onLeave: () => void;
   onConnectTikTok: () => void;
   onDisconnectTikTok: () => void;
-  onPreferenceChange: (preference: ContentSourcePreference) => void;
   onImportStateChange: (state: ActivityImportResponse) => void;
   busy: boolean;
 }) {
@@ -64,7 +59,7 @@ export function LobbyView({
     state.availableModes.includes(mode),
   );
   const canStart = connectedCount >= 2 && enabledPlayable.length > 0;
-  const mockPlayers = state.players.filter((player) => player.source === 'mock').length;
+  const notConnectedPlayers = state.players.filter((player) => player.source === 'none').length;
 
   useEffect(() => {
     if (!qrOpen || qrData) return;
@@ -114,17 +109,17 @@ export function LobbyView({
         </div>
       </div>
 
-      {mockPlayers > 0 && (
+      {notConnectedPlayers > 0 && (
         <Banner kind="info" icon={<InfoIcon size={17} />}>
-          Demo mode: {mockPlayers} {mockPlayers === 1 ? 'player uses' : 'players use'} clearly-labelled
-          demo content.{' '}
+          {notConnectedPlayers} {notConnectedPlayers === 1 ? 'player has' : 'players have'} not
+          connected TikTok yet — they cannot supply real content until they do.{' '}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
             style={{ padding: '2px 8px' }}
             onClick={() => setApiInfoOpen(true)}
           >
-            Why?
+            What can TikTok provide?
           </button>
         </Banner>
       )}
@@ -166,11 +161,9 @@ export function LobbyView({
         <TikTokConnectionCard
           tiktok={tiktok}
           importState={importState}
-          preference={preference}
           busy={busy}
           onConnect={onConnectTikTok}
           onDisconnectAndDelete={onDisconnectTikTok}
-          onPreferenceChange={onPreferenceChange}
           onImportStateChange={onImportStateChange}
         />
       )}
@@ -218,19 +211,29 @@ export function LobbyView({
         </div>
       </Modal>
 
-      <Modal open={apiInfoOpen} onClose={() => setApiInfoOpen(false)} title="About demo data">
+      <Modal open={apiInfoOpen} onClose={() => setApiInfoOpen(false)} title="What TikTok's APIs allow">
         <div className="stack-sm">
           <p className="muted small">
-            TikTok&apos;s official API does not let consumer apps read a user&apos;s liked, saved or
-            reposted videos. Instead of scraping or faking data, {BRAND.name} uses a clearly-labelled
-            demo generator for those modes.
+            ClueCrew only shows real TikTok data. If a mode cannot be filled with official API data,
+            it stays unavailable and says why — nothing is simulated.
           </p>
-          <p className="muted small">
-            Real TikTok integration is available for <strong>Who Posted This?</strong> when a player
-            connects an account with the <code>video.list</code> permission.
-          </p>
+          <ul className="muted small" style={{ paddingLeft: 18, margin: 0 }}>
+            <li>
+              <strong>Who Posted This?</strong> — your own public videos via the official Display API
+              (<code>video.list</code>).
+            </li>
+            <li>
+              <strong>Who Liked / Saved?</strong> — TikTok only exposes these in the Data Portability
+              full archive (separate approval, EEA/UK users). Without it the modes stay unavailable.
+            </li>
+            <li>
+              <strong>Who Reposted?</strong> — no official TikTok API provides reposts, so this mode
+              stays unavailable.
+            </li>
+          </ul>
           <p className="faint small">
-            Full technical breakdown: docs/TIKTOK-API.md in the project repository.
+            Full technical breakdown: docs/TIKTOK-API.md and docs/TIKTOK-DATA-PORTABILITY.md in the
+            project repository.
           </p>
         </div>
       </Modal>

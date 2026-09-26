@@ -28,14 +28,14 @@ Official sources (all fetched and read while preparing this document):
    `portability.all.single` / `portability.all.ongoing`.
 2. **Reposts are not a documented Data Portability data type at all.** There is no "Reposts"
    section in the data types documentation, and no category that would carry them. → *Who Reposted?*
-   stays demo-only.
+   stays unavailable.
 3. **Exports are asynchronous and EEA/UK-only.** Requests go `pending → downloading → expired`
    (4-day download window), data may take seconds, minutes or hours, and the API only returns data
    for TikTok users in the EEA or UK.
 
 **Consequence for ClueCrew:** *Who Liked?* and *Who Saved?* can use **real** data **only** when the
 app is approved for `portability.all.*` (full archive) and the player is in the EEA/UK. Everything
-else stays clearly-labelled demo data.
+else reports the mode as unavailable with the missing permission.
 
 ---
 

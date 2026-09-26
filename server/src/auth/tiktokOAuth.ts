@@ -163,6 +163,18 @@ export class TikTokOAuthService {
     });
 
     appEvents.emit('tiktok:linked', { userId: stateRow.userId });
+
+    // Adopt the TikTok display name when the user never picked one themselves
+    // (e.g. they clicked "Connect TikTok" before joining a room).
+    try {
+      const user = this.repos.users.get(stateRow.userId);
+      if (user && displayName && (user.displayName === 'TikTok user' || user.displayName.trim() === '')) {
+        this.repos.users.update(user.id, { displayName, now: new Date().toISOString() });
+      }
+    } catch {
+      // Non-fatal.
+    }
+
     // If a Data Portability scope was granted, kick off the (asynchronous)
     // activity export immediately. The lobby shows the honest progress state.
     try {

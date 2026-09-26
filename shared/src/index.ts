@@ -126,7 +126,7 @@ export const OFFICIAL_TIKTOK_ACCESS: Record<ModeId, OfficialAccessInfo> = {
   },
 };
 
-export type ModeAvailabilitySource = 'official_api' | 'mock' | 'special_approval' | 'unavailable';
+export type ModeAvailabilitySource = 'official_api' | 'special_approval' | 'unavailable';
 
 export interface ModeAvailability {
   mode: ModeId;
@@ -281,7 +281,8 @@ export function sanitizeGameSettings(
 // Public state (what the client receives over the socket)
 // ---------------------------------------------------------------------------
 
-export type ContentSource = 'tiktok' | 'mock';
+/** Where a player's game content comes from. Real TikTok data or nothing. */
+export type ContentSource = 'tiktok' | 'none';
 
 export interface PlayerPublic {
   id: string;
@@ -299,15 +300,13 @@ export interface PlayerPublic {
 }
 
 export interface ContentView {
-  provider: ContentSource;
+  provider: 'tiktok';
   kind: ActionKind;
   contentId: string;
   title: string | null;
   coverUrl: string | null;
   webUrl: string | null;
   authorName: string | null;
-  /** True when the item is generated demo data. Always shown as a badge in the UI. */
-  isMock: boolean;
   createdAt: number | null;
 }
 
@@ -541,7 +540,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   PLAYER_NOT_FOUND: 'Your player session was not found. Please rejoin the room.',
   CONTENT_UNAVAILABLE: 'Could not load content for this round.',
   TIKTOK_NOT_CONFIGURED: 'TikTok sign-in is not configured on this server.',
-  TIKTOK_AUTH_FAILED: 'TikTok sign-in failed. You can keep playing with demo data.',
+  TIKTOK_AUTH_FAILED: 'TikTok sign-in failed. Please try connecting again.',
   TIKTOK_STATE_INVALID: 'The TikTok sign-in request expired or was tampered with. Please try again.',
   TIKTOK_API_ERROR: 'TikTok returned an error. Please try again in a moment.',
   TIKTOK_RATE_LIMITED: 'TikTok is rate limiting us right now. Please try again shortly.',
@@ -602,8 +601,69 @@ export interface ActivityImportState {
   note: string | null;
 }
 
-/** Player preference for where their game content comes from. */
-export type ContentSourcePreference = 'auto' | 'real' | 'mock';
+/** Player content-source preference was removed: content is always real or absent. */
+
+// ---------------------------------------------------------------------------
+// TikTok account view (real Display API data for the account page)
+// ---------------------------------------------------------------------------
+
+export interface TikTokStats {
+  followerCount: number;
+  followingCount: number;
+  likesCount: number;
+  videoCount: number;
+}
+
+export interface TikTokUnavailableField {
+  field: string;
+  reason: string;
+  requiredScope: string;
+}
+
+export interface TikTokProfileView {
+  connected: boolean;
+  /** True when TikTok rejected the stored authorization and a reconnect is needed. */
+  needsReconnect: boolean;
+  openId: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  username: string | null;
+  bioDescription: string | null;
+  profileDeepLink: string | null;
+  isVerified: boolean | null;
+  stats: TikTokStats | null;
+  scopesRequested: string[];
+  scopesGranted: string[];
+  scopesMissing: string[];
+  /** Fields that cannot be shown yet, with the exact TikTok scope required. */
+  unavailable: TikTokUnavailableField[];
+  connectedAt: string | null;
+  accessTokenExpiresAt: string | null;
+  /** Empty state / error message for the UI (e.g. connect prompt). */
+  message: string | null;
+}
+
+export interface TikTokVideoView {
+  id: string;
+  title: string | null;
+  description: string | null;
+  coverUrl: string | null;
+  shareUrl: string | null;
+  durationSeconds: number | null;
+  viewCount: number | null;
+  likeCount: number | null;
+  commentCount: number | null;
+  shareCount: number | null;
+  createdAt: number | null;
+}
+
+export interface TikTokVideosView {
+  available: boolean;
+  needsReconnect: boolean;
+  reason: string | null;
+  requiredScope: string;
+  videos: TikTokVideoView[];
+}
 
 // ---------------------------------------------------------------------------
 // Helpers shared by both sides
@@ -652,7 +712,8 @@ export function normalizeAvatarSeed(input: unknown): number {
 export interface PublicServerConfig {
   brand: typeof BRAND;
   tiktokConfigured: boolean;
-  mockProviderAllowed: boolean;
+  /** Scopes this server requests during TikTok authorization. */
+  tiktokScopes: string[];
   maxPlayersPerRoom: number;
   settingsLimits: typeof SETTINGS_LIMITS;
   defaultSettings: GameSettings;

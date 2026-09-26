@@ -33,7 +33,7 @@ export function PlayerCard({
           {player.source === 'tiktok' ? (
             <Badge variant="mint">TikTok connected</Badge>
           ) : (
-            <Badge variant="amber">Demo data</Badge>
+            <Badge variant="default">Not connected</Badge>
           )}
           {!player.connected && <span className="faint">reconnecting…</span>}
         </div>
