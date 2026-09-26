@@ -105,7 +105,7 @@ the entire class of problems.
 | `BACKEND_URL` | `PUBLIC_URL` | `RENDER_EXTERNAL_URL`, else `http://localhost:<PORT>` | Public backend origin (OAuth redirect base) |
 | `FRONTEND_URL` | `CLIENT_URL` | `RENDER_EXTERNAL_URL`, else `http://localhost:5173` | Where OAuth returns to the SPA |
 | `ALLOWED_ORIGINS` | — | `FRONTEND_URL,BACKEND_URL` | CORS/CSRF origin allow-list |
-| `TOKEN_ENCRYPTION_KEY` | `SESSION_SECRET` | dev key | 64 hex chars; **required** in production |
+| `TOKEN_ENCRYPTION_KEY` | `SESSION_SECRET` | dev key | 64 hex chars (used directly) or any other non-empty secret (hashed with SHA-256); **required** in production |
 | `DATABASE_PATH` | `DATABASE_URL` (`file:` prefix supported) | `./data/cluecrew.sqlite` | SQLite file; PostgreSQL URLs are rejected with a clear message |
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | — | empty | Enable TikTok Login Kit + Display API |
 | `TIKTOK_REDIRECT_URI` | — | `{BACKEND_URL}/api/auth/tiktok/callback` | Must match the TikTok app registration exactly |

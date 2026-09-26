@@ -61,6 +61,28 @@ describe('production environment configuration', () => {
     expect(explicit.clientUrl).toBe('https://cluecrew.onrender.com');
   });
 
+  it('accepts platform-generated (non-hex) secrets by deriving a stable key', () => {
+    // Render's generateValue produces a base64 value like this one.
+    process.env.TOKEN_ENCRYPTION_KEY = 'bBSD8dAmfMm8WQGlpbw5KWFFvlLO9ys64inFLIkf2RU=';
+    const config = loadConfig({ nodeEnv: 'production' });
+    expect(config.tokenEncryptionKey).toHaveLength(32);
+
+    // Derivation is deterministic, so encrypted tokens survive restarts.
+    const again = loadConfig({ nodeEnv: 'production' });
+    expect(again.tokenEncryptionKey.equals(config.tokenEncryptionKey)).toBe(true);
+
+    // 64-hex keys are still used byte-for-byte.
+    process.env.TOKEN_ENCRYPTION_KEY = 'ab'.repeat(32);
+    const hexConfig = loadConfig({ nodeEnv: 'production' });
+    expect(hexConfig.tokenEncryptionKey.toString('hex')).toBe('ab'.repeat(32));
+  });
+
+  it('refuses to start in production without any secret', () => {
+    delete process.env.TOKEN_ENCRYPTION_KEY;
+    delete process.env.SESSION_SECRET;
+    expect(() => loadConfig({ nodeEnv: 'production' })).toThrow(/TOKEN_ENCRYPTION_KEY is required/);
+  });
+
   it('keeps the redirect URI configurable without code changes', () => {
     process.env.TOKEN_ENCRYPTION_KEY = 'cd'.repeat(32);
     process.env.TIKTOK_REDIRECT_URI = 'https://api.example/auth/callback';

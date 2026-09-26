@@ -203,11 +203,21 @@ export function loadConfig(overrides: ConfigOverrides = {}): ServerConfig {
 
   let tokenEncryptionKey = overrides.tokenEncryptionKey;
   if (!tokenEncryptionKey) {
-    const parsed = parseEncryptionKey(
-      envFirst(['TOKEN_ENCRYPTION_KEY', 'SESSION_SECRET'], ''),
-    );
+    const rawSecret = envFirst(['TOKEN_ENCRYPTION_KEY', 'SESSION_SECRET'], '');
+    const parsed = parseEncryptionKey(rawSecret);
     if (parsed) {
+      // 64 hex characters are used directly as the 32-byte AES key.
       tokenEncryptionKey = parsed;
+    } else if (rawSecret.length > 0) {
+      // Platform-generated secrets (e.g. Render's base64 generateValue) are not
+      // hex; derive a stable 32-byte key with SHA-256 so tokens remain
+      // decryptable across restarts.
+      tokenEncryptionKey = crypto.createHash('sha256').update(rawSecret).digest();
+      if (rawSecret.length < 32) {
+        console.warn(
+          '[config] TOKEN_ENCRYPTION_KEY/SESSION_SECRET is short — use at least 32 random characters.',
+        );
+      }
     } else if (isProduction) {
       throw new Error(
         'TOKEN_ENCRYPTION_KEY is required in production. Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
