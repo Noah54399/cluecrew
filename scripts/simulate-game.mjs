@@ -170,8 +170,32 @@ async function main() {
   }
   console.log(`\nRounds played: ${loggedRounds.size} - game completed successfully.`);
 
+  // Reconnection check: drop a player and bring them back with the same credentials.
+  const reconnectPlayer = players[1];
+  sockets[1].disconnect();
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  try {
+    const revived = await connect(reconnectPlayer);
+    const reconnectedState = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no room state after reconnect')), 15_000);
+      revived.on('room:state', (state) => {
+        clearTimeout(timer);
+        resolve(state);
+      });
+    });
+    const reconnectedOk = reconnectedState?.you?.playerId === reconnectPlayer.playerId;
+    console.log(
+      `${reconnectedOk ? 'PASS' : 'FAIL'}  Reconnect: ${names[1]} rejoined with their state after a drop`,
+    );
+    revived.disconnect();
+    if (!reconnectedOk) process.exitCode = 1;
+  } catch (error) {
+    console.log(`FAIL  Reconnect: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  }
+
   for (const socket of sockets) socket.disconnect();
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 
 main().catch((error) => {
