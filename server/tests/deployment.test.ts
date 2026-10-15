@@ -161,6 +161,48 @@ describe('deployment endpoints', () => {
     }
   });
 
+  it('serves legal pages on our own domain (TikTok review requires them)', async () => {
+    const ctx = await createTestContext();
+    try {
+      const terms = await api<string>(ctx.baseUrl, '/terms');
+      expect(terms.status).toBe(200);
+      expect(terms.body).toContain('Terms of Service');
+      expect(terms.body).toContain('TikTok');
+
+      const privacy = await api<string>(ctx.baseUrl, '/privacy');
+      expect(privacy.status).toBe(200);
+      expect(privacy.body).toContain('Privacy Policy');
+      expect(privacy.body).toContain('AES-256-GCM');
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('serves the TikTok URL verification file when a token is configured', async () => {
+    const ctx = await createTestContext({
+      tiktok: { siteVerification: 'test-token-123' },
+    });
+    try {
+      const response = await fetch(
+        `${ctx.baseUrl}/.well-known/tiktok-developers-site-verification.txt`,
+      );
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('tiktok-developers-site-verification=test-token-123');
+    } finally {
+      await ctx.close();
+    }
+
+    const unconfigured = await createTestContext();
+    try {
+      const response = await fetch(
+        `${unconfigured.baseUrl}/.well-known/tiktok-developers-site-verification.txt`,
+      );
+      expect(response.status).toBe(404);
+    } finally {
+      await unconfigured.close();
+    }
+  });
+
   it('answers CORS preflight for allowed origins and blocks others', async () => {
     const ctx = await createTestContext();
     try {

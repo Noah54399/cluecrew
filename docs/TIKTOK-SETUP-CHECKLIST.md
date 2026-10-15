@@ -12,10 +12,47 @@
 2. **Manage apps → Connect an app**
 3. Felder:
    - **App name:** `ClueCrew`
-   - **Website URL:** `https://cluecrew.onrender.com`
-   - Beschreibung z. B.: *Party game for friends; shows the connected account's own profile and public videos and lets friends guess who they belong to.*
-   - Icon: beliebig (ein Quadrat reicht)
-4. App-Typ: **Web** / „Connect an app" bestätigen (Organisation ist optional, „individual developer account" ist erlaubt).
+   - **Category:** Entertainment (oder Utilities)
+   - **Description** (kopierfertig, 114 Zeichen):
+     ```
+     Party game: friends guess who liked, saved or posted a TikTok video. Uses your real TikTok profile when connected.
+     ```
+   - **Terms of Service URL:** `https://cluecrew.onrender.com/terms`
+   - **Privacy Policy URL:** `https://cluecrew.onrender.com/privacy`
+   - **Web/Desktop URL:** `https://cluecrew.onrender.com`
+   - Icon: beliebiges quadratisches Bild (min. 1024×1024), z. B. ein Screenshot vom Spiel
+4. Plattform: **Web** ankreuzen.
+
+> Die ToS-/Privacy-/Web-URLs leben auf unserer eigenen Domain — der GitHub-Link kann
+> von TikTok nie verifiziert werden. Beide Seiten sind im Server eingebaut (`/terms`,
+> `/privacy`).
+
+## 1b. URL-Verifizierung (nur falls TikTok darauf besteht)
+
+Laut TikTok-Doku ist im **Sandbox-Modus** eine URL-Verifizierung **nur für die Content
+Posting API** nötig. Für **Login Kit + Display API** kann man also ohne Verifizierung
+testen. Falls das Formular trotzdem blockiert:
+
+1. Auf der App-Seite **„URL properties" / „Verify properties"** klicken.
+2. **„By URL prefix"** wählen und `https://cluecrew.onrender.com` eintragen.
+3. TikTok bietet eine **Signatur-Datei** zum Download an ( z. B.
+   `tiktok-developers-site-verification.txt`).
+4. Den Inhalt der Datei (eine Zeile, z. B.
+   `tiktok-developers-site-verification=ABC123…`) als Umgebungsvariable in Render
+   eintragen:
+   ```
+   TIKTOK_SITE_VERIFICATION = <Inhalt der Datei>
+   ```
+   Der Server liefert sie dann automatisch unter
+   `https://cluecrew.onrender.com/.well-known/tiktok-developers-site-verification.txt`
+   aus.
+5. In TikTok **„Verify"** klicken.
+
+## 1c. App-Review-Tab (Demo-Video etc.)
+
+**Fürs Testen nicht nötig.** Die „App review"-Seite (Erklärung + Demo-Video) ist nur für
+die **Produktionsfreigabe**. Nutze stattdessen den **Sandbox-Modus** der App und trag dort
+dein TikTok-Konto als Tester ein — dann funktioniert alles sofort.
 
 ## 2. Produkte hinzufügen
 
@@ -34,7 +71,7 @@ https://cluecrew.onrender.com/api/auth/tiktok/callback
 
 ## 4. Scopes
 
-In den App-Einstellungen diese Scopes aktivieren/anfordern:
+Im Formular **„+ Add scopes"** klicken und aktivieren:
 
 | Scope | Wofür | Pflicht? |
 | --- | --- | --- |

@@ -19,6 +19,7 @@ import {
 } from './lib/http.js';
 import { createApiRouter } from './api/routes.js';
 import { createMediaRouter } from './api/media.js';
+import { createLegalRouter, createTikTokVerificationRouter } from './api/legal.js';
 
 export interface AppDeps {
   config: ServerConfig;
@@ -57,6 +58,10 @@ export function createApp(deps: AppDeps): Express {
 
   app.use('/api', createApiRouter(deps));
   app.use('/api', createMediaRouter(config));
+
+  // Legal pages (Terms/Privacy) + TikTok URL-prefix verification file.
+  app.use(createLegalRouter());
+  app.use(createTikTokVerificationRouter(config.tiktok.siteVerification));
 
   const clientDist = config.clientDistPath;
   if (config.serveClient && fs.existsSync(clientDist)) {

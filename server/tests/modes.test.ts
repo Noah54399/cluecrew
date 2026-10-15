@@ -35,6 +35,7 @@ function tiktokInfo(playerId: string, scopes: string[]) {
       clientSecret: 'secret',
       redirectUri: 'http://localhost/callback',
       scopes,
+      siteVerification: '',
     },
   });
   return { playerId, source: 'tiktok' as const, capabilities: provider.getCapabilities() };

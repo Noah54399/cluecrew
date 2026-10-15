@@ -23,6 +23,11 @@ export interface TikTokConfig {
   clientSecret: string;
   redirectUri: string;
   scopes: string[];
+  /**
+   * TikTok developer "URL prefix" verification: the token from the signature
+   * file is served at /.well-known/tiktok-developers-site-verification.txt.
+   */
+  siteVerification: string;
 }
 
 /** TikTok Data Portability (activity export import) settings. */
@@ -265,6 +270,8 @@ export function loadConfig(overrides: ConfigOverrides = {}): ServerConfig {
       overrides.tiktok?.redirectUri ??
       envFirst(['TIKTOK_REDIRECT_URI'], `${publicUrl}/api/auth/tiktok/callback`),
     scopes: uniqueTiktokScopes,
+    siteVerification:
+      overrides.tiktok?.siteVerification ?? envString('TIKTOK_SITE_VERIFICATION', ''),
   };
 
   const dataPortability: DataPortabilityConfig = {

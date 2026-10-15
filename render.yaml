@@ -36,6 +36,9 @@ services:
       # dashboard after creating a TikTok developer app (Login Kit + Display API).
       # The callback URL to register there is always:
       #   https://<your-service>.onrender.com/api/auth/tiktok/callback
+      # If TikTok asks for URL ownership verification ("Verify properties" ->
+      # URL prefix), put the signature token here as well:
+      #   TIKTOK_SITE_VERIFICATION = tiktok-developers-site-verification=...
       # Once TikTok approves extra scopes (user.info.profile / user.info.stats),
       # add them here as a comma separated list:
       #   TIKTOK_EXTRA_SCOPES = user.info.profile,user.info.stats

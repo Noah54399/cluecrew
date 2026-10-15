@@ -55,6 +55,7 @@ describe('TikTokProvider', () => {
       clientSecret: 'secret',
       redirectUri: 'http://localhost/callback',
       scopes: ['user.info.basic', 'video.list'],
+      siteVerification: '',
     },
   };
 
