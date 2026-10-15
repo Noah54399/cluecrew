@@ -150,5 +150,20 @@ export function createTikTokVerificationRouter(token: string): Router {
       res.type('text/plain').send(body);
     });
   }
+
+  // Fallback for variant file names TikTok may hand out, e.g.
+  // /.well-known/tiktok-developers-site-verification-abc123.txt
+  router.get(/^\/.+\.txt$/, (req, res, next) => {
+    if (!/tiktok.*verification/i.test(req.path)) {
+      next();
+      return;
+    }
+    if (!token) {
+      res.status(404).type('text/plain').send('No TikTok verification token configured.');
+      return;
+    }
+    res.type('text/plain').send(body);
+  });
+
   return router;
 }

@@ -188,6 +188,17 @@ describe('deployment endpoints', () => {
       );
       expect(response.status).toBe(200);
       expect(await response.text()).toBe('tiktok-developers-site-verification=test-token-123');
+
+      // Variant file names TikTok sometimes hands out must work too.
+      const variant = await fetch(
+        `${ctx.baseUrl}/.well-known/tiktok-developers-site-verification-abc123.txt`,
+      );
+      expect(variant.status).toBe(200);
+      expect(await variant.text()).toBe('tiktok-developers-site-verification=test-token-123');
+
+      // Unrelated .txt files must not be swallowed by the fallback.
+      const unrelated = await fetch(`${ctx.baseUrl}/.well-known/other.txt`);
+      expect(unrelated.status).not.toBe(200);
     } finally {
       await ctx.close();
     }
