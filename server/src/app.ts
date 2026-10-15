@@ -20,6 +20,7 @@ import {
 import { createApiRouter } from './api/routes.js';
 import { createMediaRouter } from './api/media.js';
 import { createLegalRouter, createTikTokVerificationRouter } from './api/legal.js';
+import { createAssetRouter } from './api/assets.js';
 
 export interface AppDeps {
   config: ServerConfig;
@@ -62,6 +63,8 @@ export function createApp(deps: AppDeps): Express {
   // Legal pages (Terms/Privacy) + TikTok URL-prefix verification file.
   app.use(createLegalRouter());
   app.use(createTikTokVerificationRouter(config.tiktok.siteVerification));
+  // Generated app icon (1024x1024 PNG) for the TikTok developer app form.
+  app.use(createAssetRouter());
 
   const clientDist = config.clientDistPath;
   if (config.serveClient && fs.existsSync(clientDist)) {

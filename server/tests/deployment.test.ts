@@ -203,6 +203,25 @@ describe('deployment endpoints', () => {
     }
   });
 
+  it('generates a 1024x1024 PNG app icon for the TikTok form', async () => {
+    const ctx = await createTestContext();
+    try {
+      const response = await fetch(`${ctx.baseUrl}/app-icon.png`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('image/png');
+      const bytes = Buffer.from(await response.arrayBuffer());
+      // PNG signature + IHDR width/height
+      expect(bytes.subarray(0, 8)).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      expect(bytes.readUInt32BE(16)).toBe(1024);
+      expect(bytes.readUInt32BE(20)).toBe(1024);
+      expect(bytes.byteLength).toBeGreaterThan(1000);
+    } finally {
+      await ctx.close();
+    }
+  });
+
   it('answers CORS preflight for allowed origins and blocks others', async () => {
     const ctx = await createTestContext();
     try {
