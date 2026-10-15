@@ -1,6 +1,8 @@
 # TikTok App Setup — 5-Minuten-Checkliste
 
-> Für den Besitzer eines **funktionierenden TikTok-Developer-Accounts** (z. B. Papa).
+> Für **deinen eigenen neuen TikTok-Developer-Account** (das ist der Schritt mit der PIN-Mail,
+> der gerade hakt — Tipp: E-Mail-Adresse bei **Outlook** statt Gmail anlegen, Gmail ist der
+> bekannte Problemfall).
 > Es dauert einmalig ~5 Minuten. Danach verbindet sich das Spiel mit echten TikTok-Daten.
 > Wichtig: TikTok verlangt für Web-Redirects **HTTPS** — `localhost` funktioniert nicht.
 
